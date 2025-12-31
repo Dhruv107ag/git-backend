@@ -4,7 +4,19 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import upload from "../middlewares/multer.middleware.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-
+const generateAccessAndRefreshTokens = async(userId) => {
+  try {
+    const user=await User.findById(User.id);
+    refreshToken=user.generateRefreshToken();
+    accessToken=user.generateAccessToken();
+    user.refreshToken=refreshToken;
+    await user.save({validateBeforeSave:false});
+    return {accessToken,refreshToken};
+  }
+  catch(error){
+    throw new ApiError(500,"Failed to generate tokens");
+  }
+};
 const registerUser = asyncHandler(async (req, res) => {
   const { fullName, email, password, username } = req.body;
 
@@ -61,4 +73,66 @@ const registerUser = asyncHandler(async (req, res) => {
   );
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  //req body se data lena
+  //username or email pe login
+  //find user
+  //password match krna
+  //access token and refresh token generate krna
+  const {email,password,username}=req.body;
+
+  if(!email || !username) throw new ApiError(400,"Email or username is required");
+  if(!password) throw new ApiError(400,"Password is required");
+  const  user =await User.findOne({ $or: [{ email }, { username }]});
+  if(!user) throw new ApiError(404,"User not found");
+  const isPasswordMatch = await user.comparePassword(password);
+  if(!isPasswordMatch) throw new ApiError(401,"Invalid password");
+  const {refreshToken,accessToken}=await generateAccessAndRefreshTokens(user._id);
+const loggedInUser=await User.findById(user._id).select("-password -refreshToken");
+const options={httpOnly:true,secure:true}
+return res.status(200).cookie("accessToken",accessToken,options).cookie("refreshToken",refreshToken,options).cookie("accessToken",accessToken,options).json(new ApiResponse(200,"User logged in successfully",{user:loggedInUser,accessToken,refreshToken}));
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export { registerUser }
+{ loginUser };
